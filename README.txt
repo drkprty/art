@@ -25,3 +25,5 @@ Panel path:
 /panel/
 
 The panel creates siteContent/main and works documents when Save changes is used. Artwork files are uploaded under works/<work-id>/ in Firebase Storage.
+
+V12: fixes login visibility, adds Firestore connection diagnostics/retry.

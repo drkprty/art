@@ -9,13 +9,14 @@ import {
   getFirestore,
   collection,
   doc,
-  getDoc,
-  getDocs,
+  getDocFromServer,
+  getDocsFromServer,
   query,
   orderBy,
   setDoc,
   deleteDoc,
-  writeBatch
+  writeBatch,
+  enableNetwork
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 import {
   getStorage,
@@ -39,12 +40,16 @@ const authPassword=document.querySelector('#auth-password');
 const authError=document.querySelector('#auth-error');
 const worksList=document.querySelector('#works-list');
 const tpl=document.querySelector('#work-template');
+const connectionBanner=document.querySelector('#connection-banner');
 let content={site:{artistName:'Eduardo Wolffel',email:'hello@drkprty.uk',availableLabel:'Available',soldLabel:'Sold'},works:[]};
 let dragged=null;
 let loadedForUid=null;
 const deletedWorks=[];
 
 function toast(msg){const el=document.querySelector('#toast');el.textContent=msg;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2200)}
+function showConnectionBanner(message,type='warning'){connectionBanner.dataset.type=type;connectionBanner.innerHTML='';const text=document.createElement('span');text.textContent=message;connectionBanner.appendChild(text);if(type!=='ok'){const retry=document.createElement('button');retry.type='button';retry.textContent='Retry';retry.addEventListener('click',async()=>{retry.disabled=true;try{await enableNetwork(db);await loadContent();hideConnectionBanner();}catch(error){showFirestoreError(error)}finally{retry.disabled=false}});connectionBanner.appendChild(retry)}connectionBanner.hidden=false}
+function hideConnectionBanner(){connectionBanner.hidden=true;connectionBanner.innerHTML='';delete connectionBanner.dataset.type}
+function showFirestoreError(error){loadedForUid=null;console.error('Firestore load failed:',error);const code=error?.code||'';if(code==='unavailable'||String(error?.message||'').toLowerCase().includes('offline')){showConnectionBanner('Firestore is not available yet. In Firebase Console, create/enable Firestore Database for project drkprtyart, publish the included Firestore rules, then press Retry.');return}showConnectionBanner(friendlyError(error))}
 function friendlyError(error){const code=error?.code||'';if(code.includes('invalid-credential')||code.includes('wrong-password')||code.includes('user-not-found'))return 'Incorrect email or password.';if(code.includes('too-many-requests'))return 'Too many attempts. Try again later.';return error?.message||'Something went wrong.'}
 function localStarterWorks(){return[
 {id:'work-01',title:'Untitled I',year:'2026',dimensions:'100 × 80 cm',medium:'Acrylic on canvas',status:'available',image:'assets/work-01.svg',order:0},
@@ -63,7 +68,7 @@ onAuthStateChanged(auth, async user => {
   appView.hidden=false;
   if (loadedForUid===user.uid) return;
   loadedForUid=user.uid;
-  try { await loadContent(); } catch (error) { alert(friendlyError(error)); }
+  try { await enableNetwork(db); await loadContent(); hideConnectionBanner(); } catch (error) { showFirestoreError(error); fillSite(); renderWorks(); }
 });
 
 authForm.addEventListener('submit',async e=>{
@@ -75,9 +80,9 @@ authForm.addEventListener('submit',async e=>{
 document.querySelector('#logout-btn').addEventListener('click',()=>signOut(auth));
 
 async function loadContent(){
-  const siteSnap=await getDoc(doc(db,'siteContent','main'));
+  const siteSnap=await getDocFromServer(doc(db,'siteContent','main'));
   if(siteSnap.exists()) content.site={...content.site,...siteSnap.data()};
-  const worksSnap=await getDocs(query(collection(db,'works'),orderBy('order','asc')));
+  const worksSnap=await getDocsFromServer(query(collection(db,'works'),orderBy('order','asc')));
   content.works=worksSnap.empty?localStarterWorks():worksSnap.docs.map(d=>({id:d.id,...d.data()}));
   fillSite();
   renderWorks();
@@ -186,6 +191,7 @@ document.querySelector('#save-btn').addEventListener('click',async()=>{
     for(const work of deletedWorks.splice(0)){
       if(work.storagePath){deleteObject(ref(storage,work.storagePath)).catch(()=>{});}
     }
+    hideConnectionBanner();
     toast('Changes saved');
-  }catch(error){alert(friendlyError(error))}finally{btn.disabled=false}
+  }catch(error){showFirestoreError(error)}finally{btn.disabled=false}
 });
