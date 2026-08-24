@@ -33,6 +33,7 @@ const authError=document.querySelector('#auth-error');
 const worksList=document.querySelector('#works-list');
 const tpl=document.querySelector('#work-template');
 const connectionBanner=document.querySelector('#connection-banner');
+const workerStatus=document.querySelector('#worker-status');
 let content={site:{artistName:'Eduardo Wolffel',email:'hello@drkprty.uk',availableLabel:'Available',soldLabel:'Sold'},works:[]};
 let dragged=null;
 let loadedForUid=null;
@@ -49,15 +50,52 @@ function localStarterWorks(){return[
 {id:'work-03',title:'Untitled III',year:'2026',dimensions:'90 × 120 cm',medium:'Acrylic on canvas',status:'sold',image:'assets/work-03.svg',contentPath:'',order:2}
 ]}
 
+function normalizeWorkerUrl(value){
+  let url=String(value||'').trim().replace(/\/+$/,'');
+  if(url && !/^https?:\/\//i.test(url)) url='https://'+url;
+  return url;
+}
+
 function getContentApiBase(){
-  const saved=(localStorage.getItem('drkprtyContentWorkerUrl')||'').trim();
-  const configured=(contentApiConfig.baseUrl||'').trim();
+  const saved=normalizeWorkerUrl(localStorage.getItem('drkprtyContentWorkerUrl')||'');
+  const configured=normalizeWorkerUrl(contentApiConfig.baseUrl||'');
   return saved || configured;
 }
 
 function contentApiReady(){
   const url=getContentApiBase();
   return /^https:\/\//i.test(url) && !url.includes('REPLACE-WITH-YOUR-WORKER');
+}
+
+function setWorkerStatus(state,label){
+  workerStatus.dataset.state=state;
+  workerStatus.querySelector('span').textContent=label;
+}
+
+async function checkWorkerStatus(){
+  const input=document.querySelector('#content-worker-url');
+  const normalized=normalizeWorkerUrl(input.value);
+  if(!normalized || normalized.includes('REPLACE-WITH-YOUR-WORKER')){
+    setWorkerStatus('idle','Not configured');
+    return false;
+  }
+  input.value=normalized;
+  setWorkerStatus('checking','Checking…');
+  try{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),6000);
+    const response=await fetch(normalized+'/health',{signal:controller.signal,cache:'no-store'});
+    clearTimeout(timer);
+    if(!response.ok) throw new Error('Health check failed');
+    const data=await response.json().catch(()=>({}));
+    if(data.ok!==true) throw new Error('Invalid health response');
+    setWorkerStatus('ok','Connected');
+    return true;
+  }catch(error){
+    console.warn('Content Worker health check failed:',error);
+    setWorkerStatus('error','Not connected');
+    return false;
+  }
 }
 
 async function contentApiRequest(path,{method='GET',body=null,headers={}}={}){
@@ -128,16 +166,15 @@ async function loadContent(){
 function fillSite(){
   document.querySelector('#artist-name').value=content.site.artistName||'';
   document.querySelector('#contact-email').value=content.site.email||'';
-  document.querySelector('#available-label').value=content.site.availableLabel||'Available';
-  document.querySelector('#sold-label').value=content.site.soldLabel||'Sold';
   document.querySelector('#content-worker-url').value=getContentApiBase().includes('REPLACE-WITH-YOUR-WORKER')?'':getContentApiBase();
+  checkWorkerStatus();
 }
 
 function siteFromForm(){return{
   artistName:document.querySelector('#artist-name').value.trim(),
   email:document.querySelector('#contact-email').value.trim(),
-  availableLabel:document.querySelector('#available-label').value.trim(),
-  soldLabel:document.querySelector('#sold-label').value.trim(),
+  availableLabel:content.site.availableLabel||'Available',
+  soldLabel:content.site.soldLabel||'Sold',
   updatedAt:new Date().toISOString()
 }}
 
@@ -217,17 +254,21 @@ document.querySelector('#add-work-btn').addEventListener('click',()=>{
   worksList.lastElementChild.scrollIntoView({behavior:'smooth',block:'center'});
 });
 
-document.querySelector('#content-worker-url').addEventListener('change',e=>{
-  const value=e.target.value.trim().replace(/\/+$/,'');
+document.querySelector('#content-worker-url').addEventListener('change',async e=>{
+  const value=normalizeWorkerUrl(e.target.value);
+  e.target.value=value;
   if(value) localStorage.setItem('drkprtyContentWorkerUrl',value);
   else localStorage.removeItem('drkprtyContentWorkerUrl');
-  if(contentApiReady()) hideConnectionBanner();
+  const connected=await checkWorkerStatus();
+  if(connected) hideConnectionBanner();
 });
+document.querySelector('#content-worker-url').addEventListener('blur',()=>checkWorkerStatus());
 
 document.querySelector('#save-btn').addEventListener('click',async()=>{
   const btn=document.querySelector('#save-btn');btn.disabled=true;
   try{
-    const workerUrl=document.querySelector('#content-worker-url').value.trim().replace(/\/+$/,'');
+    const workerUrl=normalizeWorkerUrl(document.querySelector('#content-worker-url').value);
+    document.querySelector('#content-worker-url').value=workerUrl;
     if(workerUrl) localStorage.setItem('drkprtyContentWorkerUrl',workerUrl);
     else localStorage.removeItem('drkprtyContentWorkerUrl');
     content.site=siteFromForm();
@@ -244,7 +285,7 @@ document.querySelector('#save-btn').addEventListener('click',async()=>{
     for(const work of deletedWorks.splice(0)){
       if(work.contentPath){deleteArtworkImage(work.contentPath).catch(error=>console.warn('Could not delete GitHub image:',error));}
     }
-    if(contentApiReady())hideConnectionBanner();
+    if(contentApiReady()){hideConnectionBanner();checkWorkerStatus();}
     toast('Changes saved');
   }catch(error){showFirestoreError(error)}finally{btn.disabled=false}
 });

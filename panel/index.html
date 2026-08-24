@@ -43,9 +43,15 @@
         <div class="settings-grid">
           <label><span>Artist name</span><input id="artist-name" type="text"></label>
           <label><span>Contact email</span><input id="contact-email" type="email"></label>
-          <label><span>Green label</span><input id="available-label" type="text"></label>
-          <label><span>Red label</span><input id="sold-label" type="text"></label>
-          <label class="worker-url-field"><span>Content Worker URL</span><input id="content-worker-url" type="url" placeholder="https://drkprty-content.your-subdomain.workers.dev"></label>
+          <label class="worker-url-field">
+            <span>Content Worker URL</span>
+            <div class="worker-input-row">
+              <input id="content-worker-url" type="text" inputmode="url" placeholder="https://drkprty-content.your-subdomain.workers.dev">
+              <div id="worker-status" class="worker-status" data-state="idle" aria-live="polite">
+                <i></i><span>Not checked</span>
+              </div>
+            </div>
+          </label>
         </div>
       </section>
 
