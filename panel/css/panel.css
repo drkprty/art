@@ -6,3 +6,4 @@
 
 .connection-banner{margin:0 44px;padding:12px 16px;background:#fff7e8;border-bottom:1px solid #ead7ad;font-size:12px;line-height:1.5;color:#5f4a24}.connection-banner button{margin-left:12px;border:0;background:transparent;text-decoration:underline;cursor:pointer;font:inherit;color:inherit}.connection-banner[data-type="ok"]{background:#eef8ef;border-color:#cfe5d1;color:#2f5b35}
 @media(max-width:760px){.connection-banner{margin:0;padding:12px 20px}}
+.upload-btn.is-uploading{opacity:.5;pointer-events:none}
