@@ -45,3 +45,10 @@ V13 changes
 
 
 V14: simplified Cloudflare Worker. GitHub repo/branch/content root and Firebase API key are fixed in Worker code; only GITHUB_OWNER, ALLOWED_ORIGINS, ADMIN_EMAILS and secret GITHUB_TOKEN are configured in Cloudflare. Worker URL can be pasted directly in the admin panel and is stored locally.
+
+SEO / Google Search Console (v16)
+- robots.txt added at site root.
+- /panel/ is disallowed from crawling.
+- sitemap.xml added for https://drkprty.uk/.
+- Public homepage includes canonical https://drkprty.uk/ and index/follow metadata.
+- Admin panel includes noindex,nofollow,noarchive,nosnippet.
